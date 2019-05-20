@@ -54,7 +54,7 @@ par_detec.jitter        = 5e-03;       %ns
 
 % Ptychography algorithm parameters
 par_ptycho.init_est_method  = 'random';
-par_ptycho.cycling_method   = 'random';  %'random', 'linear' 
+par_ptycho.cycling_method   = 'linear';  %'random', 'linear' 
 par_ptycho.stp_crit     = 'npty';        %'rel-change', 'npty'
 par_ptycho.dthresh      = 1e-02;         % either the rel change threshold or the number of ptycho. iterations
 par_ptycho.npty_max     = 10;
@@ -63,7 +63,7 @@ par_ptycho.beta     = 0.5;               % step size/correction multiplier
 par_ptycho.delta    = 0.05;              % Wiener filter/rPIE parameter
 par_ptycho.Nmasks   = length(par_if.thetas);    % number of spectral masks to be used
 
-par_ptycho.mom_mode     = 'nesterov';    %'none','classic','nesterov'
+par_ptycho.mom_mode     = 'none';    %'none','classic','nesterov'
 par_ptycho.mom_T    = 30;                % number of iterations to gather when using momentum
 par_ptycho.eta      = 0.9;               % momentum 'friction' (or better yet, '1-friction')
 
@@ -76,8 +76,8 @@ par_ptycho.frft_a   = 2*atan(4*pi^2*par_prop.Dv*par_prop.L/(par_detec.timeres^2)
 % psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(-1i*2*pi*par_wf.f0.*t).*...
 %        exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
 psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
-psi = fftshift(psi);
-t   = fftshift(t);
+psi = ifftshift(psi);
+t   = ifftshift(t);
 f   = fftshift(f);
 Psi = fft(psi);
 
@@ -102,11 +102,11 @@ for s=1:length(par_if.thetas)
     %[Psi_L(s,:),H]  = fiberprop(par_wf.lam0,t,Psi_filt(s,:),par_prop.L,par_prop.Dv,par_prop.v,1);
     
     %f0  = C/par_wf.lamb0;
-    f0  = 0;
+    %f0  = 0;
     td  = par_prop.L/par_prop.v;
     b   = par_prop.Dv*par_prop.L/pi;
     %H   = atten*exp(-1i*( 2*pi*td*(f-f0) + pi^2*b*(f-f0) ));
-    H   = exp(-1i*( pi^2*b*(f-f0).^2 ));
+    H   = exp(-1i*( pi^2*b*f.^2 ));
     Psi_L(s,:)  = Psi_filt(s,:).*H;
     psi_L(s,:)  = ifft(Psi_L(s,:));
 end
@@ -207,7 +207,7 @@ obj_ini	= obj;          % saving initial estimate, just for checking purposes...
 
 A	= sqrt(sum( abs(psi).^2 ));
 A_obj   = sqrt(sum( abs(obj).^2 ));
-obj = A*obj/A_obj;      % normalizing initial estimate
+% obj = A*obj/A_obj;      % normalizing initial estimate
 Obj = fft(obj);
 Obj = Psi;           % sanity test
 Obj_ini = Obj;          % saving initial estimate for checking purposes
@@ -247,9 +247,9 @@ subplot(2,2,1); plot(Fid); title('Fid');
 subplot(2,2,2); plot(log10(Ea)); title('log10 Ea');
 subplot(2,2,3); plot(log10(Df)); title('log10 Df');
 
-% % Sanity test
-% figure(5)
-% plot(rs_f,abs(Obj_ini),f,abs(Psi)); legend('Obj_ini','\Psi(f)')
+% Original and recovered functions
+figure(5)
+plot(f,abs(Obj),f,abs(Psi)); legend('Obj','\Psi(f)')
 
 
 
