@@ -40,22 +40,22 @@ while(stp_flag==0)
     % Ptychographic iteration:
     % -(we begin in the Fourier plane)
     % -apply freq. filter
-    % -propagate back to intermediate plane
+    % -propagate forth to intermediate plane
     % -correct ampitudes (A_frF)
     % -propagate to Fourier plane (apply forward frFT)
     % -correct estimate (Wiener) -> in the Fourier plane... that's where I know the illumination
     
     %f0  = C/par_wf.lamb0;
-    f0  = 0;
+    %f0  = 0;
     td  = par_prop.L/par_prop.v;
     b   = par_prop.Dv*par_prop.L/pi;
     %H   = atten*exp(-1i*( 2*pi*td*(f-f0) + pi^2*b*(f-f0) ));
-    H   = exp(-1i*( pi^2*b*(f-f0).^2 ));
+    H   = exp(-1i*( pi^2*b*f.^2 ));
     for r=1:par_ptycho.Nmasks
         G = S(s(r),:).*Obj;
-        gfr = ifft( conj(H).*G ); % check model for propagation again
+        gfr = ifft( H.*G ); 
         gfr_c = A_frF(s(r),:).*exp(1i*angle(gfr));
-        G_c = H.*fft(gfr_c);
+        G_c = conj(H).*fft(gfr_c);
         
         U = updweight(S(s(r),:),par_ptycho.delta);
         Obj_new = Obj + par_ptycho.beta*U.*( G_c-G );
