@@ -12,8 +12,7 @@ function Faf = frft(f, a)
 narginchk(2,2);
 f = f(:);
 N = length(f);
-%shft = rem((0:N-1)+fix(N/2),N)+1;
-shft = 1:N;
+shft = rem((0:N-1)+fix(N/2),N)+1;
 sN = sqrt(N);
 a = mod(a,4);
 % do special cases

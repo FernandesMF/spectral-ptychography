@@ -6,9 +6,6 @@ C = 3e+08;  % nm/ns, speed of light
 
 %% Parameters
 
-% Execution parameters
-chck_resample   = 0;        % Make plots to check resampling?
-
 % Time and frequency vectors 
 dt  = 1e-06;        % ns; always leave this as 1e-XX, or there will be problem when resampling.
 T   = 1e-01;        % ns
@@ -51,17 +48,16 @@ par_prop.v  = 1.5e+08;
 par_detec.timeres       = 1.115e-03/5;	%ns; estimated in the script detec_timeres; make equal to dt if resampling unwanted
 par_detec.flag_noise	= 0;            % 0: no noise; 1: only jitter; 2: only poissonian; 3: jitter and poissonian
 par_detec.av_counts     = 1e+04;
-par_detec.jitter        = 5e-03;        %ns; good jitter, from possible detector in the future
-% par_detec.jitter        = 25e-03;        %ns; bad jitter, from current detectors
+par_detec.jitter        = 5e-03;       %ns
 
 
 
 % Ptychography algorithm parameters
 par_ptycho.init_est_method  = 'random';
-par_ptycho.cycling_method   = 'linear';  %'random', 'linear' 
+par_ptycho.cycling_method   = 'random';  %'random', 'linear' 
 par_ptycho.stp_crit     = 'npty';        %'rel-change', 'npty'
 par_ptycho.dthresh      = 1e-02;         % either the rel change threshold or the number of ptycho. iterations
-par_ptycho.npty_max     = 10;
+par_ptycho.npty_max     = 1000;
 par_ptycho.n_rerand     = 100;          
 par_ptycho.beta     = 0.5;               % step size/correction multiplier
 par_ptycho.delta    = 0.05;              % Wiener filter/rPIE parameter
@@ -71,30 +67,28 @@ par_ptycho.mom_mode     = 'nesterov';    %'none','classic','nesterov'
 par_ptycho.mom_T    = 30;                % number of iterations to gather when using momentum
 par_ptycho.eta      = 0.9;               % momentum 'friction' (or better yet, '1-friction')
 
-par_ptycho.frft_a   = [];
-% par_ptycho.frft_a   = 2*atan(4*pi^2*par_prop.Dv*par_prop.L/(par_detec.timeres^2))/pi; %FIX: change dt to detection dt
+par_ptycho.frft_a   = 2*atan(4*pi^2*par_prop.Dv*par_prop.L/(par_detec.timeres^2))/pi; %FIX: change dt to detection dt
 
 
 
 
 %% Generate photon initial state
-% psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(-1i*2*pi*par_wf.f0.*t).*...
-%        exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
-psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
-psi = ifftshift(psi);
-t   = ifftshift(t);
+psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(-1i*2*pi*par_wf.f0.*t).*...
+       exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
+% psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
+psi = fftshift(psi);
+t   = fftshift(t);
 f   = fftshift(f);
 Psi = fft(psi);
-% WARNING: if the form of psi changes, I should correct 'ptycho_resample' function.
 
 
 %% Generate spectral masks
 I = zeros(length(par_if.thetas),N);
-% I = ones(size(I)); % for debugging purposes...
+I = ones(size(I)); % for debugging purposes...
 for s=1:length(par_if.thetas)
-    delta 	= par_if.dr + pi*(f+par_wf.f0)*par_if.n*par_if.d*cos( par_if.thetas(s) )/C;
+    delta 	= par_if.dr + pi*f*par_if.n*par_if.d*cos( par_if.thetas(s) )/C;
 %     I(s,:)  = par_if.T^2/( (1-par_if.R)^2 ) * 1./( 1+par_if.F*(sin( delta )).^2 );    %intensity mask...
-    I(s,:)  = par_if.T*exp(1i*2*par_if.dt)./( 1 - par_if.R*exp(1i*2*par_if.dr)*exp(1i*delta) );
+%     I(s,:)  = par_if.T*exp(1i*2*par_if.dt)./( 1 - par_if.R*exp(1i*2*par_if.dr)*exp(1i*delta) );
 end
 
 
@@ -108,11 +102,11 @@ for s=1:length(par_if.thetas)
     %[Psi_L(s,:),H]  = fiberprop(par_wf.lam0,t,Psi_filt(s,:),par_prop.L,par_prop.Dv,par_prop.v,1);
     
     %f0  = C/par_wf.lamb0;
-    %f0  = 0;
+    f0  = 0;
     td  = par_prop.L/par_prop.v;
     b   = par_prop.Dv*par_prop.L/pi;
     %H   = atten*exp(-1i*( 2*pi*td*(f-f0) + pi^2*b*(f-f0) ));
-    H   = exp(-1i*( pi^2*b*f.^2 ));
+    H   = exp(-1i*( pi^2*b*(f-f0).^2 ));
     Psi_L(s,:)  = Psi_filt(s,:).*H;
     psi_L(s,:)  = ifft(Psi_L(s,:));
 end
@@ -124,34 +118,78 @@ end
 
 % Applying jitter
 if(par_detec.flag_noise==1||par_detec.flag_noise==3)
-    disp('apply jitter... coming soon')
+    disp('apply jitter')
 end
 
-% Calling resampling function
-[rs_t,rs_f,rs_N,rs_dt,rs_Fs,rs_df,rs_psi,rs_psi_L,rs_Psi,rs_I,par_ptycho] = ...
-               ptycho_resample(par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I);
+% Resampling signals at detector resolution
+if(par_detec.timeres<dt)
+    warning('Detector time resolution is set to smaller than original dt... are you sure about this?')
+end
+
+[rsp,rsq]   = rat(dt/par_detec.timeres,1e-08);
+if(rsp~=1)
+    error('Resampling wont work, rsp is not 1; did you set dt different than 1e-XX?')
+end
+
+% rs_psi = psi(1:rsq:end);
+rs_t   = t(1:rsq:end);
+rs_N   = length(rs_t);
+rs_dt  = abs(rs_t(2)-rs_t(1));
+
+par_ptycho.frft_a   = 2*atan(4*pi^2*par_prop.Dv*par_prop.L/(rs_dt^2))/pi %FIX: change dt to detection dt
+
+rs_Fs  = 1/rs_dt;           % GHz
+rs_df  = rs_Fs/rs_N;        % GHz
+rs_f   = (0:rs_N-1)*rs_df;	% GHz
+rs_f   = rs_f-mean(rs_f)-par_wf.f0; % GHz
+
+if( ~issorted(rs_f) || ~issorted(ifftshift(f)) )
+    error('Unsorted frequency vector; this will spoil the resampling')
+end
+
+foo	= zeros(size(rs_f));
+fooo = zeros(size(rs_t));
+for s=1:length(foo)
+    [~,foo(s)]	= min( (f-rs_f(s)).^2 );
+    [~,fooo(s)] = min( (t-rs_t(s)).^2 );
+end
+% rs_psi = psi(fooo);
+% rs_Psi = fft(rs_psi);
+% rs_Psi = Psi(fooo);
+
+rs_psi = exp(-rs_t.^2/(2*par_wf.sig_t^2) ).*exp(-1i*2*pi*par_wf.f0.*rs_t).*...
+       exp(1i*par_wf.a*rs_t.^2/par_wf.sig_t^2 );
+% psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
+% rs_psi = fftshift(rs_psi);
+% t   = fftshift(t);
+% f   = fftshift(f);
+rs_Psi = fft(ifftshift(rs_psi));
+
+% FIX: get wf/I at the points newly defined in the scales;
+for s=1:length(par_if.thetas)
+    rs_psi_L(s,:)	= psi_L(s,1:rsq:end);
+    rs_I(s,:)	= I(s,foo);
+end
 
 % Checking resampling
-if(chck_resample)
-    figure(21)
-    subplot(2,2,1); plot(1:rs_N,rs_t,'-o',(1:N)*rs_N/N,t); title('rs\_t');
-    subplot(2,2,2); plot(1:rs_N,rs_f,'-o',(1:N)*rs_N/N,f*rs_N/N); title('rs\_f (original f rescaled)');
-    subplot(2,2,3); plot(rs_t,abs(rs_psi),'-o',t,abs(psi)); title('\psi(t)'); legend('resampled','original')
-    subplot(2,2,4); plot(rs_f,abs(rs_Psi)*N/rs_N,'-o',f,abs(Psi)); title('\Psi(f)'); legend('resampled (rescaled)','original')
+figure(21)
+subplot(2,2,1); plot(1:rs_N,rs_t,'-o',(1:N)*rs_N/N,t); title('rs\_t');
+subplot(2,2,2); plot(1:rs_N,rs_f,'-o',(1:N)*rs_N/N,f); title('rs\_f');
+subplot(2,2,3); plot(rs_t,abs(rs_psi),'-o',t,abs(psi)); title('\psi(t)'); legend('resampled','original')
+subplot(2,2,4); plot(rs_f,abs(rs_Psi),'-o',f,abs(Psi)); title('\Psi(f)'); legend('resampled','original')
 
-    figure(22)
-    subplot(2,1,1); plot(rs_t,abs(rs_psi_L)); title('resampled \psi_{L}(t)');
-    subplot(2,1,2); plot(t,abs(psi_L)); title('original \psi_{L}(t)');
+figure(22)
+subplot(2,1,1); plot(rs_t,abs(rs_psi_L)); title('resampled \psi_{L}(t)');
+subplot(2,1,2); plot(t,abs(psi_L)); title('original \psi_{L}(t)');
 
-    figure(23)
-    subplot(3,1,1); plot(rs_f,abs(rs_I)); title('resampled I(f)');
-    subplot(3,1,2); plot(rs_f,abs(rs_Psi)); title('resampled \Psi(f)');
-    subplot(3,1,3); plot(f,abs(I)); title('original I(f)');
-end
+figure(23)
+subplot(3,1,1); plot(rs_f,abs(rs_I)); title('resampled I(f)');
+subplot(3,1,2); plot(rs_f,abs(Psi(foo))); title('resampled \Psi(f)');
+subplot(3,1,3); plot(f,abs(I)); title('original I(f)');
 
 % Applying poissonian noise
 if(par_detec.flag_noise==2||par_detec.flag_noise==3)
-    disp('apply poissonian noise... coming soon')
+    disp('apply poissonian noise')
 end
 
 
@@ -161,23 +199,21 @@ end
 disp('Starting Ptychography')
 
 % Initial random estimate (smoothed, gaussian complex numbers)
-% obj     = (randn(1,N)-0.5)+1i*(randn(1,N)-0.5);
-% obj = smooth(obj,10).';
-obj = psi;           % sanity test
+% obj     = (randn(1,rs_N)-0.5)+1i*(randn(1,rs_N)-0.5);
+obj = rs_psi;           % sanity test
 obj_ini	= obj;          % saving initial estimate, just for checking purposes...
+% obj = smooth(obj,10).';
 
 
 A	= sqrt(sum( abs(psi).^2 ));
 A_obj   = sqrt(sum( abs(obj).^2 ));
 obj = A*obj/A_obj;      % normalizing initial estimate
-% Obj = fft(obj);
-Obj = Psi;           % sanity test
+Obj = fft(obj);
+Obj = rs_Psi;           % sanity test
 Obj_ini = Obj;          % saving initial estimate for checking purposes
 
 % Ptychographic engine
-% [Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
-[Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,abs(psi_L),Psi);
-% [Obj_fin,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj_ini,S,A_frF,Psi)
+[Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
 
 
 
@@ -209,9 +245,9 @@ subplot(2,2,1); plot(Fid); title('Fid');
 subplot(2,2,2); plot(log10(Ea)); title('log10 Ea');
 subplot(2,2,3); plot(log10(Df)); title('log10 Df');
 
-% Original and recovered functions
+% Sanity test
 figure(5)
-plot(f,abs(Obj),f,abs(Psi)); legend('Obj','\Psi(f)')
+plot(rs_f,abs(Obj_ini),f,abs(Psi)); legend('Obj_ini','\Psi(f)')
 
 
 
