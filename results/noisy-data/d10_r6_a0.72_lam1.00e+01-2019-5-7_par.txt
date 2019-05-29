@@ -1,0 +1,9 @@
+d   = 10;      % Hilbert space dimension
+r   = 6;      % rank of mask projectors; we will use the contiguous family with d projectors scheme
+a   = 0.720000;      % orders of frft that will be "measured"
+
+Nproj	= 10;
+Nobs	= 100;   % ptychographic projectors * comp. basis projectors
+Nstates = 10;
+noise   = 1;  % Noise mode: 0 -> none; 1-> poissonian
+noise_av_counts  = 1.00e+01 % poissonian noise average counts (if desired)
