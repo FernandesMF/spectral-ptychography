@@ -1,5 +1,5 @@
 function [rs_t,rs_f,rs_N,rs_dt,rs_Fs,rs_df,rs_psi,rs_psi_L,rs_Psi,rs_I,par_ptycho] = ...
-               ptycho_resample(par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I)
+               ptycho_resample(par_ptycho,par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I)
     % This function was previously part of the main script, but I made a function of it since it got
     % a bit extense.
     %
