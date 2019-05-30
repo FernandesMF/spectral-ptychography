@@ -129,8 +129,7 @@ end
 
 % Calling resampling function
 [rs_t,rs_f,rs_N,rs_dt,rs_Fs,rs_df,rs_psi,rs_psi_L,rs_Psi,rs_I,par_ptycho] = ...
-               ptycho_resample(par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I);
-
+               ptycho_resample(par_ptycho,par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I);
 % Checking resampling
 if(chck_resample)
     figure(21)
@@ -161,18 +160,18 @@ end
 disp('Starting Ptychography')
 
 % Initial random estimate (smoothed, gaussian complex numbers)
-% obj     = (randn(1,N)-0.5)+1i*(randn(1,N)-0.5);
-% obj = smooth(obj,10).';
-obj = psi;           % sanity test
+obj	= (randn(1,N)-0.5)+1i*(randn(1,N)-0.5);
+obj	= smooth(obj,10).';
+% obj = psi;            % sanity test
 obj_ini	= obj;          % saving initial estimate, just for checking purposes...
 
 
 A	= sqrt(sum( abs(psi).^2 ));
 A_obj   = sqrt(sum( abs(obj).^2 ));
 obj = A*obj/A_obj;      % normalizing initial estimate
-% Obj = fft(obj);
-Obj = Psi;           % sanity test
-Obj_ini = Obj;          % saving initial estimate for checking purposes
+Obj	= fft(obj);
+% Obj = Psi;            % sanity test
+Obj_ini	= Obj;          % saving initial estimate for checking purposes
 
 % Ptychographic engine
 % [Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
