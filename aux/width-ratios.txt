@@ -1,0 +1,14 @@
+Goodness of results with 10^4 average total counts
+
+Ratio of widths (sig_pdf/sig_wfn)	Good?
+2	Not really...
+1.5	Decent central width, but some ripples aside...
+1	Pretty good, minor ripples
+0.85	Pretty good, some ripples
+0.7	Good, ripples are really small
+0.6	Quite good, almost no ripples
+0.5	Outstanding, no ripples even with less counts
+
+Ok, I think we should aim for ratios between 0.7 to 0.5!
+
+
