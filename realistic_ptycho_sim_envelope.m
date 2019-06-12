@@ -1,6 +1,8 @@
 clear all
 % close all
 
+% FIX: implement rerandomization
+
 % ATTENTION: use (nano) SI units throughout this code
 C = 3e+08;  % nm/ns, speed of light
 
@@ -8,6 +10,8 @@ C = 3e+08;  % nm/ns, speed of light
 
 % Execution parameters
 chck_resample   = 0;        % Make plots to check resampling?
+chck_jitter     = 1;        % Plots to check jitter blurring?
+chck_arr_times  = 1;        % Plots to check generated arrival times?
 
 % Time and frequency vectors 
 dt  = 1e-06;        % ns; always leave this as 1e-XX, or there will be problem when resampling.
@@ -49,10 +53,10 @@ par_prop.v  = 1.5e+08;
 % Detection
 % par_detec.timeres       = 1.115e-03;	%ns; estimated in the script detec_timeres; make equal to dt if resampling unwanted
 par_detec.timeres       = 1.115e-03/5;	%ns; estimated in the script detec_timeres; make equal to dt if resampling unwanted
-par_detec.flag_noise	= 0;            % 0: no noise; 1: only jitter; 2: only poissonian; 3: jitter and poissonian
-par_detec.av_counts     = 1e+04;
+par_detec.flag_noise	= 3;            % 0: no noise; 1: only jitter; 2: only poissonian; 3: jitter and poissonian
+par_detec.av_counts     = 1e+04;        
 par_detec.jitter        = 5e-03;        %ns; good jitter, from possible detector in the future
-% par_detec.jitter        = 25e-03;        %ns; bad jitter, from current detectors
+% par_detec.jitter        = 25e-03;       %ns; bad jitter, from current detectors
 
 
 
@@ -61,7 +65,7 @@ par_ptycho.init_est_method  = 'random';
 par_ptycho.cycling_method   = 'linear';  %'random', 'linear' 
 par_ptycho.stp_crit     = 'npty';        %'rel-change', 'npty'
 par_ptycho.dthresh      = 1e-02;         % either the rel change threshold or the number of ptycho. iterations
-par_ptycho.npty_max     = 10;
+par_ptycho.npty_max     = 100;
 par_ptycho.n_rerand     = 100;          
 par_ptycho.beta     = 0.5;               % step size/correction multiplier
 par_ptycho.delta    = 0.05;              % Wiener filter/rPIE parameter
@@ -80,7 +84,9 @@ par_ptycho.frft_a   = [];
 %% Generate photon initial state
 % psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(-1i*2*pi*par_wf.f0.*t).*...
 %        exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
-psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
+% psi = exp(-t.^2/(2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/par_wf.sig_t^2 );
+psi = exp(-t.^2/(2*2*par_wf.sig_t^2) ).*exp(1i*par_wf.a*t.^2/(2*par_wf.sig_t^2) ); % sigs. of intensity, not wf!
+psi = psi/sqrt(sum(abs(psi).^2));       %/(2*pi*2*par_wf.sig_t^2) did not work... normalizing wf (remember its std is sqrt(2)*sit]g_t)
 psi = ifftshift(psi);
 t   = ifftshift(t);
 f   = fftshift(f);
@@ -96,6 +102,7 @@ for s=1:length(par_if.thetas)
 %     I(s,:)  = par_if.T^2/( (1-par_if.R)^2 ) * 1./( 1+par_if.F*(sin( delta )).^2 );    %intensity mask...
     I(s,:)  = par_if.T*exp(1i*2*par_if.dt)./( 1 - par_if.R*exp(1i*2*par_if.dr)*exp(1i*delta) );
 end
+% FIX: check if I is increasing the total intensity of psi_L...
 
 
 
@@ -122,12 +129,8 @@ end
 
 %% Generate measurements
 
-% Applying jitter
-if(par_detec.flag_noise==1||par_detec.flag_noise==3)
-    disp('apply jitter... coming soon')
-end
-
 % Calling resampling function
+disp('Resampling');
 [rs_t,rs_f,rs_N,rs_dt,rs_Fs,rs_df,rs_psi,rs_psi_L,rs_Psi,rs_I,par_ptycho] = ...
                ptycho_resample(par_ptycho,par_detec,par_wf,par_prop,par_if,t,dt,f,psi_L,I);
 % Checking resampling
@@ -148,9 +151,67 @@ if(chck_resample)
     subplot(3,1,3); plot(f,abs(I)); title('original I(f)');
 end
 
-% Applying poissonian noise
-if(par_detec.flag_noise==2||par_detec.flag_noise==3)
-    disp('apply poissonian noise... coming soon')
+% Applying jitter to psi_L's (which are the detected quantities)
+if(par_detec.flag_noise==1||par_detec.flag_noise==3)
+    disp('Applying jitter');
+    blur	= exp( -(t-mean(t)).^2/(2*par_detec.jitter^2) )/sqrt(2*pi*par_detec.jitter^2);
+    foo     = psi_L;
+    for s=1:length(par_if.thetas)
+        psi_L(s,:)	= sqrt( conv( abs(psi_L(s,:)).^2,blur,'same' ) );
+        psi_L(s,:)  = ifftshift(psi_L(s,:));
+    end
+    % Checking jitter
+    if(chck_jitter)
+        figure(31)
+        subplot(3,1,1); plot(t,abs(foo)); title('original psi_L');
+        subplot(3,1,2); plot(t,blur); title('blur');
+        subplot(3,1,3); plot(t,abs(psi_L)); title('blurred psi_L');
+    end
+end
+
+% Generating counts
+ if(par_detec.flag_noise==2||par_detec.flag_noise==3)
+    disp('Generating counts')
+    % Generating Cumulative Distribution Functions (of each |psi_L|²)
+    totI_L	= zeros(length(par_if.thetas),1);      % Total intensity of psi_L
+    cdf_L	= zeros(size(psi_L));                   % CDF of |psi_L|²
+    for s=1:length(par_if.thetas)
+        foo = 0;        % accumulator variable to walk through psi_L
+        for r=1:N
+            foo	= foo + abs(psi_L(s,r)).^2;
+            cdf_L(s,r)	= foo;
+        end
+        totI_L(s)	= foo;
+    end
+    
+    % Generating number of counts (poissonian) for each CDF (prop. to total intensity)
+%     totCounts_L = poissrnd(par_detec.av_counts*totI_L);
+    totCounts_L = poissrnd(totI_L);
+    % FIX: totI_L has many more counts than I expected... perhaps I_L is increasing amplitudes?
+    
+    % Drawing random arrival times from CDF
+    sim_psi_L	= zeros(size(psi_L));   
+    for s=1:length(par_if.thetas)
+        foo	= totI_L(s)*rand(totCounts_L(s),1);
+        foo = sort(foo,'ascend');
+        bar = 1;
+        dum = 0;
+        for r=1:N
+            while( bar<totCounts_L(s) && cdf_L(s,r)>foo(bar) )
+                bar = bar+1;
+            end
+            sim_psi_L(s,r)	= bar-dum;
+            dum = bar;
+        end
+    end
+    % FIX: send sqrt of counts to ptychography
+    
+    % Check generated arrival times
+    if(chck_arr_times)
+        figure(32)
+        subplot(2,1,1); plot(t,abs(psi_L).^2); title('original pdfs');
+        subplot(2,1,2); plot(t,sim_psi_L); title('simulated data');
+    end
 end
 
 
@@ -175,14 +236,17 @@ Obj_ini	= Obj;          % saving initial estimate for checking purposes
 
 % Ptychographic engine
 % [Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
-[Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,abs(psi_L),Psi);
 % [Obj_fin,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj_ini,S,A_frF,Psi)
+
+% [Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,abs(psi_L),Psi);
+[Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,sqrt(sim_psi_L),Psi);
 
 
 
 
 
 %% Show results
+disp('Plotting results');
 
 % Original wavefunctions
 figure(1)
@@ -213,164 +277,3 @@ figure(5)
 plot(f,abs(Obj),f,abs(Psi)); legend('Obj','\Psi(f)')
 
 
-
-%% Old code
-
-% psi = exp(-t.^2/(2*sig_t^2) ).*exp(1i*2*pi*f0.*t).*exp(1i*a*t.^2/sig_t^2 );
-% psi = fftshift(psi);
-% t   = fftshift(t);
-% [psiL] = fiberprop(lam0,t,psi,L,Dv,v,atten)
-
-
-
-% from https://en.wikipedia.org/wiki/Wave_packet , section about dispersive solution; I will use x=0
-% further
-
-% psi = 1./sqrt(1+1i*2*t).*exp( -(k0*t).^2./(1+4*t.^2) ).*exp( 1i*(k0^2*t)./(4+16*t.^2) );
-% psi = ifftshift(psi);
-% Psi = fft(psi);
-
-%{
-%% Apply filters in the frequency domain, generate ptychographic data
-% gaussian: g(x) = 1/sig*sqrt(2pi) exp( -(x-mu)^2/(2*sig^2))
-
-% Making gaussian filters
-S = zeros(N,length(psi));
-for r=1:N
-    S(r,:) = exp( -(f-mu(r)).^2/(2*sig(r)^2) )/(sig(r)*sqrt(2*pi));
-end
-% S = ifftshift(S,2);
-
-% Applying filters to original spectra
-Psi_S = zeros(size(S));
-for r=1:N
-    Psi_S(r,:) = S(r,:).*Psi;
-end
-
-% Fourier plane amplitudes
-A_F = abs(Psi_S);
-
-% Intermediate plane amplitudes
-% fractional FT: https://www.mathworks.com/matlabcentral/fileexchange/41351-frft-m
-frPsi_S = zeros(size(Psi_S));
-psi_S = zeros(size(Psi_S));
-for r=1:N
-    psi_S(r,:) = ifft(Psi_S(r,:));
-    frPsi_S(r,:) = frft(Psi_S(r,:),-1+a);
-end
-A_frF = abs(frPsi_S);
-
-
-
-
-%% Run ptychographic iterative engine
-
-% Initial random estimate (smoothed, gaussian complex numbers)
-obj = (randn(size(psi))-0.5)+1i*(randn(size(psi))-0.5);
-obj_ini = obj;      %saving initial estimate, just for checking purposes...
-% obj = smooth(obj,10).';
-% obj(200:800) = 0;   %zeroing part of the estimate that should not have any amp
-A = sqrt(sum( abs(psi).^2 ));
-A_obj = sqrt(sum( abs(obj).^2 ));
-obj = A*obj/A_obj;   %normalizing initial estimate
-Obj = fft(obj);
-
-% Ptychographic engine
-stp_flag = 0;
-Ea = [];
-Df = [];
-Fid = [];
-npty = 0;
-
-switch mom_mode
-    case 'none'
-        disp('Momentum will not be used');
-    case {'classic','nesterov'}
-        mom_t = 0;
-        v = zeros(1,length(Obj));
-        Obj_old = Obj;
-    otherwise
-        error('Unrecognized momentum mode');
-end
-
-while(stp_flag==0)
-    % Cycling order
-    switch cycling_method
-        case 'linear'
-            s = 1:N;
-        case 'random'
-            s = randperm(N);
-        otherwise
-            error('Unrecognized cycling method')
-    end
-    
-    % Ptychographic iteration:
-    % -(we wil begin in the Fourier plane)
-    % -apply freq. filter
-    % -apply inverse frFT (propagate back to intermediate plane)
-    % -correct ampitudes (A_frF)
-    % -propagate to Fourier plane (apply forward frFT)
-    % -correct estimate (Wiener) -> in the Fourier plane... that's where I know the illumination
-    for r=1:N
-        G = S(s(r),:).*Obj;
-        gfr = frft(G,-1+a).';
-        gfr_c = A_frF(s(r),:).*exp(1i*angle(gfr));
-        G_c = frft(gfr_c,1-a).';
-        
-        U = updweight(S(s(r),:),delta);
-        Obj_new = Obj + beta*U.*( G_c-G );
-    end
-    
-    % Momentum update
-    if(strcmp(mom_mode,'classic')||strcmp(mom_mode,'nesterov'))
-        mom_t = mom_t+1;
-        if(mom_t==mom_T)
-            v = eta*v + Obj_new-Obj_old;
-            switch mom_mode
-                case 'classic'
-                    Obj_new =  Obj_old + v;
-                case 'nesterov'
-                    Obj_new = Obj_new + eta*v;
-            end
-            mom_t = 0;
-            Obj_old = Obj_new;
-        end
-    end
-   
-    % Calculate errors, fidelity, rel. change
-    ea = sum( (abs(Obj_new)-abs(Psi)).^2 );
-    df = sqrt(sum( abs(Obj_new-Obj).^2 ))/sqrt(sum(abs(Obj).^2));
-    fid = abs(Obj_new*Psi')/( sqrt(sum(abs(Obj_new).^2))*sqrt(sum(abs(Psi).^2)) );
-    
-    Ea = [Ea ea];
-    Df = [Df df];
-    Fid = [Fid fid];
-    
-    npty = npty+1;
-    Obj = Obj_new;
-    
-    % Check stop condition
-    switch stp_crit
-        case 'rel-change'
-            if(df<stp_param||npty>=npty_max)
-                stp_flag = 1;
-            end
-        case 'npty'
-            if(npty>=stp_param)
-                stp_flag = 1;
-            end
-        otherwise
-            error('Unrecognized stop criterion')
-    end
-    
-end
-
-%% Plots, show results
-
-figure(1)
-subplot(1,2,1)
-plot(t,abs(psi));
-subplot(1,2,2)
-plot(t,angle(psi))
-
-%}
