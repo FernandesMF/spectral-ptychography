@@ -246,8 +246,10 @@ Obj_ini	= Obj;          % saving initial estimate for checking purposes
 % [Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
 % [Obj_fin,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj_ini,S,A_frF,Psi)
 
-% [Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,abs(psi_L),Psi);
-[Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj,I,sqrt(sim_psi_L),Psi);
+% [Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,par_detec,...
+%                                             f,t,Obj,I,abs(psi_L),Psi,);
+[Obj,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,par_detec,...
+                                            f,t,Obj,I,sqrt(sim_psi_L),Psi);
 
 
 
