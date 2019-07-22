@@ -10,7 +10,7 @@ C = 3e+08;  % nm/ns, speed of light
 
 % Execution parameters
 chck_resample   = 0;        % Make plots to check resampling?
-chck_jitter     = 1;        % Plots to check jitter blurring?
+chck_jitter     = 0;        % Plots to check jitter blurring?
 chck_arr_times  = 1;        % Plots to check generated arrival times?
 
 % Time and frequency vectors 
@@ -44,7 +44,7 @@ par_if.thetas  = [0:1:10]*pi/180.0;             % in radians
 par_if.F    = 4*par_if.R/( 1-par_if.R )^2;      % finesse
 
 % Propagation through fiber
-par_prop.L  = 100;     % m
+par_prop.L  = 1;     % m
 par_prop.Dl = 18e-06;   % s/m^2
 par_prop.Dv = -par_wf.lam0^2/(2*pi*C)*par_prop.Dl;
 par_prop.v  = 1.5e+08;
@@ -53,8 +53,8 @@ par_prop.v  = 1.5e+08;
 % Detection
 % par_detec.timeres       = 1.115e-03;	%ns; estimated in the script detec_timeres; make equal to dt if resampling unwanted
 par_detec.timeres       = 1.115e-03/5;	%ns; estimated in the script detec_timeres; make equal to dt if resampling unwanted
-par_detec.flag_noise	= 3;            % 0: no noise; 1: only jitter; 2: only poissonian; 3: jitter and poissonian
-par_detec.av_counts     = 1e+04;        
+par_detec.flag_noise	= 2;            % 0: no noise; 1: only jitter; 2: only poissonian; 3: jitter and poissonian
+par_detec.av_counts     = 1e+06;        
 par_detec.jitter        = 5e-03;        %ns; good jitter, from possible detector in the future
 % par_detec.jitter        = 25e-03;       %ns; bad jitter, from current detectors
 
@@ -71,7 +71,7 @@ par_ptycho.beta     = 0.5;               % step size/correction multiplier
 par_ptycho.delta    = 0.05;              % Wiener filter/rPIE parameter
 par_ptycho.Nmasks   = length(par_if.thetas);    % number of spectral masks to be used
 
-par_ptycho.mom_mode     = 'nesterov';    %'none','classic','nesterov'
+par_ptycho.mom_mode     = 'none';    %'none','classic','nesterov'
 par_ptycho.mom_T    = 30;                % number of iterations to gather when using momentum
 par_ptycho.eta      = 0.9;               % momentum 'friction' (or better yet, '1-friction')
 
@@ -128,6 +128,11 @@ end
 
 
 %% Generate measurements
+% noise flag values:
+%	-0: no noise
+%   -1: only jitter
+%   -2: only poissonian
+%   -3: jitter and poissonian
 
 % Calling resampling function
 disp('Resampling');
@@ -185,8 +190,8 @@ end
     end
     
     % Generating number of counts (poissonian) for each CDF (prop. to total intensity)
-%     totCounts_L = poissrnd(par_detec.av_counts*totI_L);
-    totCounts_L = poissrnd(totI_L);
+    totCounts_L = poissrnd(par_detec.av_counts*totI_L);
+%     totCounts_L = poissrnd(totI_L);
     % FIX: totI_L has many more counts than I expected... perhaps I_L is increasing amplitudes?
     
     % Drawing random arrival times from CDF
@@ -204,13 +209,15 @@ end
             dum = bar;
         end
     end
-    % FIX: send sqrt of counts to ptychography
     
     % Check generated arrival times
     if(chck_arr_times)
         figure(32)
         subplot(2,1,1); plot(t,abs(psi_L).^2); title('original pdfs');
         subplot(2,1,2); plot(t,sim_psi_L); title('simulated data');
+        figure(33)
+        subplot(2,1,1); plot(t,abs(psi_L)); title('sqrt of original pdfs');
+        subplot(2,1,2); plot(t,sqrt(sim_psi_L)); title('sqrt of simulated data');
     end
 end
 
@@ -235,6 +242,7 @@ Obj	= fft(obj);
 Obj_ini	= Obj;          % saving initial estimate for checking purposes
 
 % Ptychographic engine
+% FIX: make a clause to choose which of these lines to call
 % [Obj,Ea,Df,Fid,bad_res] =  spectralPIE(par_ptycho,Obj,rs_I,abs(rs_psi_L),rs_Psi);
 % [Obj_fin,Ea,Df,Fid,bad_res] =  spectralPIE_prop(par_ptycho,par_prop,f,Obj_ini,S,A_frF,Psi)
 

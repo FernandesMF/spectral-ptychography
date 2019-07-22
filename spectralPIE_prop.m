@@ -26,6 +26,13 @@ switch par_ptycho.mom_mode
         error('Unrecognized momentum mode');
 end
 
+% f0  = C/par_wf.lamb0;
+% f0  = 0;
+td  = par_prop.L/par_prop.v;
+b   = par_prop.Dv*par_prop.L/pi;
+%H   = atten*exp(-1i*( 2*pi*td*(f-f0) + pi^2*b*(f-f0) ));
+H   = exp(-1i*( pi^2*b*f.^2 ));
+
 while(stp_flag==0)
     % Cycling order
     switch par_ptycho.cycling_method
@@ -45,12 +52,6 @@ while(stp_flag==0)
     % -propagate to Fourier plane (apply forward frFT)
     % -correct estimate (Wiener) -> in the Fourier plane... that's where I know the illumination
     
-    %f0  = C/par_wf.lamb0;
-    %f0  = 0;
-    td  = par_prop.L/par_prop.v;
-    b   = par_prop.Dv*par_prop.L/pi;
-    %H   = atten*exp(-1i*( 2*pi*td*(f-f0) + pi^2*b*(f-f0) ));
-    H   = exp(-1i*( pi^2*b*f.^2 ));
     for r=1:par_ptycho.Nmasks
         G = S(s(r),:).*Obj;
         gfr = ifft( H.*G ); 
@@ -59,6 +60,14 @@ while(stp_flag==0)
         
         U = updweight(S(s(r),:),par_ptycho.delta);
         Obj_new = Obj + par_ptycho.beta*U.*( G_c-G );
+        
+%         % Debug figures
+%         figure(99)
+%         subplot(2,2,1); plot(f,abs(G));
+%         subplot(2,2,2); plot(f,abs(gfr));
+%         subplot(2,2,3); plot(f,abs(gfr_c));
+%         subplot(2,2,4); plot(f,abs(G_c));
+%         pause(1)
     end
     
     % Momentum update
