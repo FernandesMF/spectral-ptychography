@@ -15,7 +15,7 @@ chck_arr_times  = 1;        % Plots to check generated arrival times?
 
 % Time and frequency vectors 
 dt  = 1e-06;        % ns; always leave this as 1e-XX, or there will be problem when resampling.
-T   = 1e-01;        % ns
+T   = 5e-02;        % ns
 t   = -T/2:dt:T/2;	% ns
 N   = length(t);
 Fs  = 1/dt;         % GHz
@@ -229,7 +229,7 @@ disp('Starting Ptychography')
 
 % Initial random estimate (smoothed, gaussian complex numbers)
 obj	= (randn(1,N)-0.5)+1i*(randn(1,N)-0.5);
-obj	= smooth(obj,10).';
+obj	= smooth(obj,9).';
 % obj = psi;            % sanity test
 obj_ini	= obj;          % saving initial estimate, just for checking purposes...
 
